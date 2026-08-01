@@ -1,12 +1,16 @@
-FROM python:3.12-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+services:
+  emqx:
+    image: emqx/emqx-enterprise:6.2.2
+    container_name: emqx
+    networks:
+      emqx-bridge:
+        aliases:
+        - node.emqx.com
+    ports:
+      - 1883:1883
+      - 8083:8083
+      - 8084:8084
+      - 8883:8883
+      - 18083:18083
+    # volumes:
+    #   - $PWD/emqx1_data:/opt/emqx/data
