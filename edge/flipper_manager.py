@@ -43,7 +43,7 @@ class FlipperManager:
         if self.flipper:
             path = f"/ext/subghz/{label}_on.sub"
             print(f"[FlipperManager] TX ON -> {path}")
-            print(self.flipper.subghz.tx_from_file(path))
+            self.flipper._serial_wrapper.send(f"subghz tx_from_file {path} 3 0\n")
         else:
             print("Flipper is not initialized. Please start the manager first.")
 
@@ -59,12 +59,12 @@ class FlipperManager:
 class MQTTListener:
 
     def __init__(self, flipper_manager, broker_host="localhost", broker_port=1883,
-                 base_topic=None, username=None, password=None):
+                 base_topic="flippermaxxin", username=None, password=None):
         self.flipper_manager = flipper_manager
         self.broker_host = broker_host
         self.broker_port = broker_port
-        self.base_topic = base_topic or os.environ.get("FLIPPERMAXXIN_TOPIC", "/flippermaxxin")
-        self.subghz_topic_filter = f"{self.base_topic}/subghz/*"
+        self.base_topic = base_topic
+        self.subghz_topic_filter = f"{self.base_topic}/subghz/+"
 
         self.client = mqtt.Client()
         if username:
@@ -73,6 +73,8 @@ class MQTTListener:
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_subscribe = self._on_subscribe
+        self.client.on_log = self._on_log
 
     def start(self):
         print(f"[MQTTListener] Connecting to {self.broker_host}:{self.broker_port}")
@@ -97,6 +99,13 @@ class MQTTListener:
 
     def _on_disconnect(self, client, userdata, rc):
         print(f"[MQTTListener] Disconnected (rc={rc}).")
+
+    def _on_subscribe(self, client, userdata, mid, granted_qos):
+        print(f"[MQTTListener] Subscription confirmed (mid={mid}, qos={granted_qos}).")
+
+    def _on_log(self, client, userdata, level, buf):
+        # Utile per vedere handshake TLS/auth falliti a basso livello
+        print(f"[MQTTListener][paho-log] {buf}")
 
     def _on_message(self, client, userdata, msg):
         print(f"[MQTTListener] Received message on {msg.topic}: {msg.payload.decode('utf-8', errors='replace')}")
@@ -150,10 +159,15 @@ def main():
     parser.add_argument("--config", type=str, help="Path to the configuration file", required=True)
     parser.add_argument("--mqtt-host", type=str, default=os.environ.get("MQTT_HOST", "localhost"))
     parser.add_argument("--mqtt-port", type=int, default=int(os.environ.get("MQTT_PORT", 1883)))
-    parser.add_argument("--mqtt-user", type=str, default=os.environ.get("MQTT_USER"))
-    parser.add_argument("--mqtt-pass", type=str, default=os.environ.get("MQTT_PASS"))
-    parser.add_argument("--mqtt-topic", type=str, default=os.environ.get("FLIPPERMAXXIN_TOPIC", "/flippermaxxin"),help="Base topic, es. /flippermaxxin (subscribe to <topic>/subghz/+)")
+    parser.add_argument("--mqtt-user", type=str, default=os.environ.get("MQTT_USERNAME"))
+    parser.add_argument("--mqtt-pass", type=str, default=os.environ.get("MQTT_PASSWORD"))
+    parser.add_argument("--mqtt-topic", type=str,
+                         default=os.environ.get('MQTT_TOPIC_PREFIX', 'flippermaxxin'),
+                         help="Base topic, es. flipper0 (subscribe to <topic>/subghz/+)")
     args = parser.parse_args()
+
+    print(f"[Config] host={args.mqtt_host} port={args.mqtt_port} topic={args.mqtt_topic} "
+          f"user={'<set>' if args.mqtt_user else '<none>'}")
 
     if not os.path.exists(args.config):
         print(f"Configuration file {args.config} does not exist.")
