@@ -10,11 +10,10 @@ services:
       - /dev/bus/usb:/dev/bus/usb
     environment:
       - MQTT_HOST=${MQTT_HOST}
-      - MQTT_PORT=${MQTT_PORT:-8883}
+      - MQTT_PORT=${MQTT_PORT:-1883}
       - MQTT_USERNAME=${MQTT_USERNAME}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
-      - MQTT_TLS=${MQTT_TLS:-true}
-      - MQTT_TOPIC_PREFIX=flipper0
+      - MQTT_TOPIC_PREFIX=${MQTT_TOPIC_PREFIX:-flipper0}
     restart: unless-stopped
     networks:
       - flipper-net

@@ -6,8 +6,9 @@ import json
 # ================= Impostazioni =================
 BROKER_ADDRESS = "localhost"  # Indirizzo del broker EMQX locale
 BROKER_PORT = 1883            # Porta di default
-TOPIC_SUB = "/flippermaxxin"  # Topic a cui iscriversi
-TOPIC_PUB = "/subghz/prova"   # Topic su cui pubblicare
+BASE_TOPIC = "flippermaxxin"                     # Deve combaciare col base_topic del dispatcher (NIENTE slash iniziale)
+TOPIC_SUB = f"{BASE_TOPIC}/#"                     # Ci iscriviamo a tutto l'albero per debug
+TOPIC_PUB = f"{BASE_TOPIC}/subghz/prova"          # Deve essere <base_topic>/subghz/<device_path>
 # ================================================
 
 # Callback: eseguita quando il client si connette con successo al broker
@@ -45,24 +46,17 @@ try:
     # Questo permette di ricevere messaggi senza bloccare il ciclo while sottostante
     client.loop_start()
     
-    # Loop principale per pubblicare dati periodici
+    # Loop principale: alterna comandi on/off compatibili col dispatcher
+    toggle = True
     while True:
-        # Generiamo dati fittizi
-        dati_random = {
-            "frequenza": random.choice([433.92, 868.35, 315.00]),
-            "rssi": random.randint(-100, -30),
-            "snr": round(random.uniform(1.0, 10.0), 2),
-            "protocollo": random.choice(["NICE", "CAME", "FAAC", "RAW"])
-        }
-        
-        # Convertiamo il dizionario in una stringa JSON
-        payload_str = json.dumps(dati_random)
-        
-        # Pubblichiamo il messaggio
+        tag = "on" if toggle else "off"
+        toggle = not toggle
+
+        payload_str = json.dumps({"tag": tag})
+
         client.publish(TOPIC_PUB, payload_str, qos=0)
         print(f"[OUT] Pubblicato su {TOPIC_PUB}: {payload_str}")
-        
-        # Attesa di 5 secondi prima della prossima pubblicazione
+
         time.sleep(5)
 
 except KeyboardInterrupt:
