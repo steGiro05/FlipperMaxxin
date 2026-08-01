@@ -43,7 +43,7 @@ class FlipperManager:
         if self.flipper:
             path = f"/ext/subghz/{label}_on.sub"
             print(f"[FlipperManager] TX ON -> {path}")
-            print(self.flipper.subghz.tx_from_file(path))
+            self.flipper._serial_wrapper.send(f"subghz tx_from_file {path} 3 0\n")
         else:
             print("Flipper is not initialized. Please start the manager first.")
 
