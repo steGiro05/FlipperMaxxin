@@ -34,10 +34,10 @@ class FlipperManager:
                 elif hasattr(self.flipper, "close"):
                     self.flipper.close()
             except Exception as e:
-                print(f"Attenzione: errore durante la chiusura della seriale: {e}")
+                print(f"Error while closing serial connection: {e}")
             finally:
                 self.flipper = None
-                print("\nConnessione seriale chiusa. Uscita pulita.")
+                print("\nClosed connection. Cleaning up.")
 
     def turn_on(self, label):
         if self.flipper:
@@ -64,7 +64,7 @@ class MQTTListener:
         self.broker_host = broker_host
         self.broker_port = broker_port
         self.base_topic = base_topic or os.environ.get("FLIPPERMAXXIN_TOPIC", "/flippermaxxin")
-        self.subghz_topic_filter = f"{self.base_topic}/subghz/+"
+        self.subghz_topic_filter = f"{self.base_topic}/subghz/*"
 
         self.client = mqtt.Client()
         if username:
@@ -75,7 +75,7 @@ class MQTTListener:
         self.client.on_disconnect = self._on_disconnect
 
     def start(self):
-        print(f"[MQTTListener] Connessione a {self.broker_host}:{self.broker_port}")
+        print(f"[MQTTListener] Connecting to {self.broker_host}:{self.broker_port}")
         self.client.connect(self.broker_host, self.broker_port, keepalive=60)
         self.client.loop_start()
 
@@ -99,6 +99,7 @@ class MQTTListener:
         print(f"[MQTTListener] Disconnected (rc={rc}).")
 
     def _on_message(self, client, userdata, msg):
+        print(f"[MQTTListener] Received message on {msg.topic}: {msg.payload.decode('utf-8', errors='replace')}")
         topic = msg.topic
         payload_raw = msg.payload.decode("utf-8", errors="replace").strip()
 

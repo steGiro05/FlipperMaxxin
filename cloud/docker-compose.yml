@@ -1,16 +1,16 @@
 services:
   emqx:
-    image: emqx/emqx-enterprise:6.2.2
+    image: emqx/emqx:latest
     container_name: emqx
-    networks:
-      emqx-bridge:
-        aliases:
-        - node.emqx.com
+    restart: unless-stopped
+    environment:
+      - EMQX_NAME=emqx
+    volumes:
+      - /opt/emqx/data
+      - /opt/emqx/log
     ports:
-      - 1883:1883
-      - 8083:8083
-      - 8084:8084
-      - 8883:8883
-      - 18083:18083
-    # volumes:
-    #   - $PWD/emqx1_data:/opt/emqx/data
+      - "1883:1883"   
+      - "8083:8083"   
+      - "8084:8084"   
+      - "8883:8883"   
+      - "18083:18083"
