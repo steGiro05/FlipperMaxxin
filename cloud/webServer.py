@@ -1,37 +1,56 @@
 from flask import Flask, request, redirect
 
-import threading
-import mqttManager # <- Import corretto!
+import paho.mqtt.client as mqtt
+
+client = None
+
+# ================= Settings =================
+BROKER_ADDRESS = "localhost"  
+BROKER_PORT = 1883            
+BASE_TOPIC = "flippermaxxin"                     
+# ================================================
+
+class MQTTClient:
+    def __init__(self, broker_address, broker_port):
+        self.broker_address = broker_address
+        self.broker_port = broker_port
+
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+    def start(self):
+        try:
+            self.client.connect(self.broker_address, self.broker_port, keepalive=60)
+            self.client.loop_start()
+            print("MQTT client started and running in background.")
+        except Exception as e:
+            print(f"❌ Failed to connect to MQTT broker: {e}")
+
+    def publish(self, topic, payload):
+        try:
+            print(f"[OUT] Publishing to {topic}: {payload}")
+            self.client.publish(topic, payload, qos=0)
+            print(f"[OUT] Published to {topic}: {payload}")
+        except Exception as e:
+            print(f"❌ Failed to publish message: {e}")
 
 app = Flask(__name__)
 
-# Avvia il manager MQTT (decommenta se è necessario avviarlo all'accensione del server)
-# mqttManager.start()
-
-@app.route("/flippermaxime", methods=["GET", "POST"])
-def flippermaxime():
+@app.route("/flippermaxxin", methods=["GET", "POST"])
+def flippermaxxin():
     if request.method == "POST":
-        # 1. Recupero i dati dal form
         device_name = request.form.get("name")
-        signal_type = request.form.get("type") # Sarà 'subGHz' o 'infrared'
-        action = request.form.get("action")    # Sarà 'on' o 'off'
+        signal_type = request.form.get("type") 
+        action = request.form.get("action")    
 
-        # 2. Il topic e il nome file corrispondono (es. "subGHz/TV_Sala")
-        topic = f"{signal_type}/{device_name}"
-        file_name = topic 
+        topic = f"{BASE_TOPIC}/{signal_type}/{device_name}"
 
-        # 3. Invio il comando ad MQTT
-        # (Assicurati che send_tag nel tuo mqttManager.py accetti questi parametri)
         if action == "on":
-            mqttManager.send_tag(topic, "ON")
+            client.publish(topic, "on")
         elif action == "off":
-            mqttManager.send_tag(topic, "OFF")
+            client.publish(topic, "off")
 
-        # Ricarica la pagina dopo l'invio del comando
-        return redirect("/flippermaxime")
+        return redirect("/flippermaxxin")
 
-    # Se la richiesta è GET, mostriamo un'interfaccia HTML di base senza bisogno di file esterni.
-    # Sostituisci la vecchia variabile html_interface con questa:
     
     html_interface = """
     <!DOCTYPE html>
@@ -140,7 +159,6 @@ def flippermaxime():
             .btn-off:hover {
                 background-color: var(--btn-off-hover);
             }
-            /* Icona Flipper stilizzata */
             .icon {
                 font-size: 40px;
                 margin-bottom: 10px;
@@ -155,7 +173,7 @@ def flippermaxime():
                 <p>Gestione payload MQTT</p>
             </div>
             
-            <form method="POST">
+            <form method="POST" id="deviceForm">
                 <div class="form-group">
                     <label for="name">Nome Device:</label>
                     <input type="text" id="name" name="name" placeholder="es. TV_Sala" required>
@@ -175,6 +193,30 @@ def flippermaxime():
                 </div>
             </form>
         </div>
+
+        <script>
+        document.getElementById('deviceForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const submitter = e.submitter; 
+            const formData = new FormData(form);
+            if (submitter && submitter.name) {
+                formData.append(submitter.name, submitter.value);
+            }
+
+            const targetUrl = form.getAttribute('action') || window.location.pathname;
+
+            fetch(targetUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.text())
+            .then(() => {
+            })
+            .catch(err => console.error('Errore invio comando:', err));
+        });
+        </script>
     </body>
     </html>
     """
@@ -183,18 +225,21 @@ def flippermaxime():
 # Rotta di default che reindirizza subito alla rotta principale
 @app.route("/")
 def index():
-    return redirect("/flippermaxime")
+    return redirect("/flippermaxxin")
 
 
 if __name__ == "__main__":
     
-    # NOTA SUL CAMBIO PORTA (Da 5000 a 5001):
-    # Il progetto è iniziato su ambiente Windows dove la porta 5000 era libera e utilizzabile di default.
-    # Passando a macOS (da Monterey in poi), la porta 5000 è occupata dal servizio di sistema "Ricevitore AirPlay".
-    # Per evitare conflitti "Address already in use" senza dover modificare le impostazioni di sistema del Mac,
-    # la porta del web server è stata spostata sulla 5001.
-    
+    # NOTE ABOUT THE PORT CHANGE (From 5000 to 5001):
+    # The project started in a Windows environment, where port 5000 was free and usable by default.
+    # After moving to macOS (Monterey onward), port 5000 is used by the system service "AirPlay Receiver".
+    # To avoid "Address already in use" conflicts without changing macOS system settings,
+    # the web server port was moved to 5001.
+    client = MQTTClient(BROKER_ADDRESS, BROKER_PORT)
+    client.start()
     app.run(
         host="0.0.0.0",
-        port=5001
+        port=5001,
     )
+
+    client.client.loop_stop()
